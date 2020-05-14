@@ -73,7 +73,7 @@ def train_EM_Seg():
     train_data = train_data[3:, :, :, :]
     train_label = train_label[3:, :, :, :]
     train_data, train_label = data_augmentation(train_data, train_label)
-    model = Unet(1, image_shape[0])
+    model = Unet(1, image_shape)
     step_counter = 0
     data_order = np.arange(train_data.shape[0])
     step_in_epoch = (train_data.shape[0] // batch_size) + 1

@@ -20,7 +20,7 @@ def unet_decoder_unit(input_layer, skip_layer, filter_num, layer_num):
     return unet_unit(skipping, filter_num, layer_num)
     
 def Unet(num_class, image_size):
-    inputs = Input(shape=[image_size, image_size, 1])
+    inputs = Input(shape=image_size)
     filters_list = [64, 128, 256, 512, 1024]
 
     conv1 = unet_unit(inputs, filters_list[0], 1)
@@ -48,3 +48,6 @@ def Unet(num_class, image_size):
                    name='conv_final')(conv9)
                    
     return Model(inputs = inputs, outputs = conv10)
+
+def UnetPP(num_class, image_size):
+    pass
