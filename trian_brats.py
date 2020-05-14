@@ -23,7 +23,7 @@ validation_loss = Mean(name='val_loss')
 validation_iou = MeanIoU(num_classes=2, name='val_iou')
 
 image_shape = (224,224,1)
-epoch_num = 10*50
+epoch_num = 10*100
 batch_size = 10
 dataset_fraction = 10
 
@@ -69,8 +69,11 @@ def get_brats_data(base_path):
         image_path = os.path.join(base_path, item)
         mri_volume = load_image(image_path)
         mask_volume = load_mask(image_path)
-        data_list.append(resize_image_batch(mri_volume))
-        mask_list.append(resize_image_batch(mask_volume))
+        zero_index= np.sum(mask_volume, axis=1)
+        zero_index = np.sum(zero_index, axis=1)
+        zero_index = np.sum(zero_index, axis=1)
+        data_list.append(resize_image_batch(mri_volume[zero_index>0]))
+        mask_list.append(resize_image_batch(mask_volume[zero_index>0]))
     data_list = np.concatenate(data_list)
     mask_list = np.concatenate(mask_list)
     return data_list, mask_list
@@ -107,6 +110,8 @@ def prepare_brats15_npy():
     all_data = all_data[data_order,:,:,:]/ 4095  # MRI pixel range
     all_label = all_label[data_order,:,:,:].astype('float64')
     pack_size = all_data.shape[0] // dataset_fraction
+    print('all data shape:', all_data.shape)
+    print('all label shape:', all_label.shape)
     for i in range(dataset_fraction):
         np.save('training_data_%d.npy'%i,all_data[i*pack_size:(i+1)*pack_size])
         np.save('training_labe_%d.npy'%i, all_label[i*pack_size:(i+1)*pack_size])
@@ -128,7 +133,7 @@ def train_brats15_subsets():
     model_path = os.path.join(train_log_dir, 'best_model.h5')
     summary_writer = tf.summary.create_file_writer(train_log_dir)
     best_iou = -1
-    step_in_epoch = validation_data.shape[0] // batch_size
+    step_in_epoch = (validation_data.shape[0] // batch_size) + 1
     # 训练环节
     for ep in range(epoch_num):
         train_data = np.load('training_data_%d.npy'%(2+(ep%(dataset_fraction-2))))
