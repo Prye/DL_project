@@ -10,7 +10,7 @@ def unet_unit(input_layer, filter_num, layer_num):
                    padding='same',  activation='relu', 
                    name='conv'+str(layer_num)+'_2')(input_layer)
     return conv2
-    
+
 def unet_decoder_unit(input_layer, skip_layer, filter_num, layer_num):
     upsample = UpSampling2D(size=(2,2))(input_layer)
     conv1 = Conv2D(filters=filter_num, kernel_size=2, strides=1, 
@@ -50,4 +50,47 @@ def Unet(num_class, image_size):
     return Model(inputs = inputs, outputs = conv10)
 
 def UnetPP(num_class, image_size):
-    pass
+    # TO BE tested
+    inputs = Input(shape=image_size)
+    filters_list = [32, 64, 128, 256, 512]
+
+    # backbone
+    conv00 = unet_unit(inputs, filters_list[0], 1)
+
+    conv10 = MaxPooling2D(pool_size=(2, 2))(conv00)
+    conv10 = unet_unit(conv10, filters_list[1], 2)
+
+    conv20 = MaxPooling2D(pool_size=(2, 2))(conv10)
+    conv20 = unet_unit(conv20, filters_list[2], 3)
+
+    conv30 = MaxPooling2D(pool_size=(2, 2))(conv20)
+    conv30 = unet_unit(conv30, filters_list[3], 4)
+    conv30 = Dropout(0.5)(conv30)
+
+    conv40 = MaxPooling2D(pool_size=(2, 2))(conv30)
+    conv40 = unet_unit(conv40, filters_list[4], 5)
+    conv40 = Dropout(0.5)(conv40)
+    # nested structure
+    conv01 = unet_decoder_unit(conv10, conv00, filters_list[0], 1)
+    conv11 = unet_decoder_unit(conv20, conv10, filters_list[1], 11)
+    conv21 = unet_decoder_unit(conv30, conv20, filters_list[2], 21)
+
+    skip02 = concatenate([conv00, conv01], axis=3)
+    conv02 = unet_decoder_unit(conv11, skip02, filters_list[0], 2)
+    skip12 = concatenate([conv10, conv11], axis=3)
+    conv12 = unet_decoder_unit(conv21,skip12, filters_list[1], 12)
+    skip03 = concatenate([skip02, conv02], axis=3)
+    conv03 = unet_decoder_unit(conv12, skip03, filters_list[0], 3)
+    # decoder, similar to unet
+    conv31 = unet_decoder_unit(conv40, conv30, filters_list[3], 31)
+    conv22 = unet_decoder_unit(conv31, concatenate([conv21, conv20], axis=3), filters_list[2], 22)    
+    conv13 = unet_decoder_unit(conv22, concatenate([skip12, conv12], axis=3), filters_list[1], 13)
+    conv04 = unet_decoder_unit(conv13, concatenate([skip03, conv03], axis=3), filters_list[0], 4)
+    
+    conv_f2 = Conv2D(filters=2, kernel_size=3, strides=1, 
+                   padding='same', activation='relu', 
+                   name='conv_f2')(conv04)
+    conv_f1 = Conv2D(filters=num_class, kernel_size=1, strides=1, 
+                   padding='same', activation='relu', 
+                   name='conv_final')(conv_f2)
+    return Model(inputs = inputs, outputs = conv_f1)

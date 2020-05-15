@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import tensorflow as tf
+import tensorflow_addons as tfa
 import skimage
 import datetime
 
@@ -16,17 +17,26 @@ from UNet import Unet
 
 optimizer = Adam()
 
-loss_function = BinaryCrossentropy()
+#loss_function = BinaryCrossentropy()
+loss_function = tfa.losses.SigmoidFocalCrossEntropy()
 
 train_loss = Mean(name='train_loss')
 validation_loss = Mean(name='val_loss')
-validation_iou = MeanIoU(num_classes=2, name='val_iou')
 
 image_shape = (224,224,1)
 epoch_num = 10*100
 batch_size = 10
 dataset_fraction = 10
-
+def meanIoU_np(predict, label):
+    predict[predict>=0.5] = 1
+    predict[predict<0.5] = 0
+    predict = predict.astype(np.bool)
+    label = label.astype(np.bool)
+    intersection_area  = np.sum(np.logical_and(predict, label))
+    union_area = np.sum(np.logical_or(predict, label))
+    if union_area==0:
+        return 0
+    return intersection_area/union_area
 def load_image(image_path):
     # stacking 4 different imaging modality
     all_channel_im_path = os.listdir(image_path)
@@ -122,8 +132,7 @@ def train_brats15_subsets():
     # 数据准备
     #  分配训练，验证，测试
     validation_data = np.load('training_data_0.npy')
-    validation_label = np.load('training_labe_0.npy')
-    validation_order = np.arange(validation_data.shape[0])
+    validation_label = np.load('training_labe_0.npy').astype('float32')
     #train_data, train_label = data_augmentation(train_data, train_label)
     model = Unet(1, image_shape)
     step_counter = 0
@@ -137,7 +146,7 @@ def train_brats15_subsets():
     # 训练环节
     for ep in range(epoch_num):
         train_data = np.load('training_data_%d.npy'%(2+(ep%(dataset_fraction-2))))
-        train_label = np.load('training_labe_%d.npy'%(2+(ep%(dataset_fraction-2))))
+        train_label = np.load('training_labe_%d.npy'%(2+(ep%(dataset_fraction-2)))).astype('float32')
         for step in range(step_in_epoch):
             step_counter += 1
             batch_start = step*batch_size
@@ -157,22 +166,15 @@ def train_brats15_subsets():
         # validation step
         validation_loss_list = []
         validation_iou_list = []
-        for i in range(20):
+        for i in range(step_in_epoch):
             val_batch_label = validation_label[i*batch_size:(i+1)*batch_size]
             predictions = model.predict(validation_data[i*batch_size:(i+1)*batch_size])
             v_loss = loss_function(val_batch_label, predictions)
             validation_loss(v_loss)
-            predictions[predictions>=0.5] = 1.0
-            predictions[predictions<0.5] = 0.0
-            validation_iou.update_state(val_batch_label, predictions)
-            validation_iou_list.append(validation_iou.result())
+            validation_iou_list.append(meanIoU_np(predictions, val_batch_label))
             validation_loss_list.append(validation_loss.result())
             validation_loss.reset_states()
-            validation_iou.reset_states()
         
-        validation_data = validation_data[validation_order]
-        validation_label = validation_label[validation_order]
-        np.random.shuffle(validation_order)
         validation_score_loss = np.mean(validation_loss_list)
         validation_score_iou = np.mean(validation_iou_list)
         with summary_writer.as_default():
@@ -186,8 +188,9 @@ def train_brats15_subsets():
     
     
     # test step
+    # model_path = 'logs\\UNet_Brats_20200515-112128\\best_model.h5'
     test_data = np.load('training_data_1.npy')
-    test_label = np.load('training_labe_1.npy')
+    test_label = np.load('training_labe_1.npy').astype('float32')
     model.load_weights(model_path)
     test_loss_list = []
     test_iou_list = []
@@ -206,13 +209,13 @@ def train_brats15_subsets():
         
         # 打印test set里面的图片 10 zhang
         if step==0:
+            test_pred[test_pred==1.0] = 255.0
             for im_idx in range(test_pred.shape[0]):
-                imsave(os.path.join(train_log_dir, 'test_%d.png'%im_idx), test_pred[im_idx])
+                imsave(os.path.join(train_log_dir, 'original_%d.png'%im_idx), batch_data[im_idx]*3)
+                imsave(os.path.join(train_log_dir, 'test_%d.png'%im_idx), test_pred[im_idx].astype('uint8'))
                 imsave(os.path.join(train_log_dir, 'test_label_%d.png'%im_idx), batch_label[im_idx])
-    
-        validation_iou.update_state(batch_label, test_pred)
-        test_iou_list.append(validation_iou.result())
-        validation_iou.reset_states()
+        test_iou_list.append(meanIoU_np(batch_label, test_pred))
+        break
     print('test mIoU:', np.mean(test_iou_list))
     print('test loss:', np.mean(test_loss_list))
 
