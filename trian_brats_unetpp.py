@@ -24,7 +24,7 @@ train_loss = Mean(name='train_loss')
 validation_loss = Mean(name='val_loss')
 
 image_shape = (224,224,1)
-epoch_num = 0
+epoch_num = 10 * 100
 batch_size = 8
 dataset_fraction = 10
 def meanIoU_np(predict, label):
@@ -171,7 +171,7 @@ def train_brats15_subsets():
     
     
     # test step
-    model_path = 'logs\\UNetpp_Brats_20200515-160513\\best_model.h5'
+    #model_path = 'logs\\UNetpp_Brats_20200515-160513\\best_model.h5'
     test_data = np.load('training_data_1.npy')
     test_label = np.load('training_labe_1.npy').astype('float32')
     model.load_weights(model_path)
