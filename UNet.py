@@ -52,8 +52,8 @@ def Unet(num_class, image_size):
 def UnetPP(num_class, image_size):
     # TO BE tested
     inputs = Input(shape=image_size)
-    filters_list = [32, 64, 128, 256, 512]
-
+    #filters_list = [32, 64, 128, 256, 512]
+    filters_list = [48, 96, 192, 384, 768]
     # backbone
     conv00 = unet_unit(inputs, filters_list[0], 1)
 
@@ -71,21 +71,21 @@ def UnetPP(num_class, image_size):
     conv40 = unet_unit(conv40, filters_list[4], 5)
     conv40 = Dropout(0.5)(conv40)
     # nested structure
-    conv01 = unet_decoder_unit(conv10, conv00, filters_list[0], 1)
-    conv11 = unet_decoder_unit(conv20, conv10, filters_list[1], 11)
-    conv21 = unet_decoder_unit(conv30, conv20, filters_list[2], 21)
+    conv01 = unet_decoder_unit(conv10, conv00, filters_list[0], 201)
+    conv11 = unet_decoder_unit(conv20, conv10, filters_list[1], 211)
+    conv21 = unet_decoder_unit(conv30, conv20, filters_list[2], 221)
 
     skip02 = concatenate([conv00, conv01], axis=3)
-    conv02 = unet_decoder_unit(conv11, skip02, filters_list[0], 2)
+    conv02 = unet_decoder_unit(conv11, skip02, filters_list[0], 202)
     skip12 = concatenate([conv10, conv11], axis=3)
-    conv12 = unet_decoder_unit(conv21,skip12, filters_list[1], 12)
+    conv12 = unet_decoder_unit(conv21,skip12, filters_list[1], 212)
     skip03 = concatenate([skip02, conv02], axis=3)
-    conv03 = unet_decoder_unit(conv12, skip03, filters_list[0], 3)
+    conv03 = unet_decoder_unit(conv12, skip03, filters_list[0], 203)
     # decoder, similar to unet
-    conv31 = unet_decoder_unit(conv40, conv30, filters_list[3], 31)
-    conv22 = unet_decoder_unit(conv31, concatenate([conv21, conv20], axis=3), filters_list[2], 22)    
-    conv13 = unet_decoder_unit(conv22, concatenate([skip12, conv12], axis=3), filters_list[1], 13)
-    conv04 = unet_decoder_unit(conv13, concatenate([skip03, conv03], axis=3), filters_list[0], 4)
+    conv31 = unet_decoder_unit(conv40, conv30, filters_list[3], 231)
+    conv22 = unet_decoder_unit(conv31, concatenate([conv21, conv20], axis=3), filters_list[2], 222)    
+    conv13 = unet_decoder_unit(conv22, concatenate([skip12, conv12], axis=3), filters_list[1], 213)
+    conv04 = unet_decoder_unit(conv13, concatenate([skip03, conv03], axis=3), filters_list[0], 204)
     
     conv_f2 = Conv2D(filters=2, kernel_size=3, strides=1, 
                    padding='same', activation='relu', 
